@@ -1,6 +1,6 @@
 {{ block "content" . }}
 <div class="container">
-	<form action="/web/post">
+	<form action="/post">
 		<div class="row">
 			<input type="text" placeholder="Dodelo dodeldi dodeldooo dooo." class="form-control col-sm-9 dodel-input" name="text">
 			<button name="color" value="{{ .NextColor }}" class="btn bg-{{ .NextColor }} color-button offset-sm-1 col-sm-2"role="submit">Submit</button>
@@ -11,8 +11,8 @@
 {{ range .Posts }}
 <div class="card ">
 	<div class="card-block bg-{{ .Color }}">
-		<a class="main-title" href="/web/comments?id={{ .Post }}">
-			<form action="/web/vote">
+		<a class="main-title" href="/comments?id={{ .Post }}">
+			<form action="/vote">
 				<div class="row">
 					<input type="hidden" name="post" value="{{ .Post }}">
 					<div class="text-center vote-block col-xs-2">
