@@ -1,0 +1,55 @@
+{{ block "content" . }}
+<div class="container">
+	<form action="/web/post">
+		<div class="row">
+			<input type="hidden" name="topic" value="{{ .Main.Post }}">
+			<input type="hidden" name="keep" value="keep">
+			<input type="text" placeholder="Dodelo dodeldi dodeldooo dooo." class="form-control col-sm-9 dodel-input" name="text">
+			<button name="color" value="{{ .NextColor }}" class="btn bg-{{ .NextColor }} color-button offset-sm-1 col-sm-2"role="submit">Submit</button>
+		</div>
+	</form>
+</div>
+<hr>
+<div class="card">
+	<div class="card-header bg-{{ .Main.Color }}">
+		<form action="/web/vote">
+			<div class="row">
+				<input type="hidden" name="post" value="{{ .Main.Post }}">
+				<div class="text-center vote-block col-xs-2">
+					<button class="button-upvote {{ if .Main.HasUpvoted }}bg-none active{{ else }}bg-inactive{{end }}" role="submit" name="upvote" value="upvote">▲</button><br>
+					<span class="card-votes">{{ .Main.Votes }}</span><br>
+					<button class="button-downvote {{ if .Main.HasDownvoted }}bg-none active{{ else }}bg-inactive{{end}}" role="submit" name="downvote" value="downvote">▼</button>
+				</div>
+				<div class="dodel lead col-xs-10">{{ .Main.Text }}</div>
+			</div>
+			<div class="container since-post">
+				{{ .Main.SincePost }}
+			</div>
+		</form>
+	</div>
+	<div class="card-block full-width">
+		{{ range .Comments }}
+		<div class="card ">
+			<div class="card-block bg-{{ .Color }}">
+				<form action="/web/vote">
+					<div class="row">
+						<input type="hidden" name="topic" value="{{ .Topic }}">
+						<input type="hidden" name="keep" value="keep">
+						<input type="hidden" name="post" value="{{ .Post }}">
+						<div class="text-center vote-block col-xs-2">
+							<button class="button-upvote {{ if .HasUpvoted }}bg-none active{{ else }}bg-inactive{{end }}" role="submit" name="upvote" value="upvote">▲</button><br>
+							<span class="card-votes">{{ .Votes }}</span><br>
+							<button class="button-downvote {{ if .HasDownvoted }}bg-none active{{ else }}bg-inactive{{end}}" role="submit" name="downvote" value="downvote">▼</button>
+						</div>
+						<div class="dodel lead col-xs-10">{{ .Text }}</div>
+					</div>
+					<div class="container since-post">
+						{{ .SincePost }}
+					</div>
+				</form>
+			</div>
+		</div>
+		{{ end }}
+	</div>
+</div>
+{{ end }}
