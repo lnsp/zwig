@@ -36,8 +36,17 @@ type Database interface {
 	Get(id string) Post
 	Post(user, text, color, topic string, img image.Image) string
 	Vote(user, post string, upvote bool)
+	VoteState(id, user string) VoteState
+	Votes(post string) []Vote
+	CountVotes(id string) int
+	CountComments(id string) int
 	Comments(id string) []Post
-	List() []Post
+	Karma(user string) int
+	List(count int, maxAge time.Duration, minRank float64) []Post
+	ToJSONVote(vote Vote) JSONVote
+	ToJSONVotes(votes []Vote) []JSONVote
+	ToJSONPost(post Post) JSONPost
+	ToJSONPosts(posts []Post) []JSONPost
 }
 
 // JSONDatabase is a database reading and writing to a JSON file.

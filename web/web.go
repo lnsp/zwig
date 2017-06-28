@@ -34,13 +34,13 @@ type authHandleFunc func(http.ResponseWriter, *http.Request, bool, string)
 // Handler presents a Web UI to interact with posts.
 type Handler struct {
 	mux                *http.ServeMux
-	database           *models.JSONDatabase
+	database           models.Database
 	debug              bool
 	listTmpl, showTmpl *template.Template
 }
 
 // New initializes a new web handler.
-func New(database *models.JSONDatabase, debug bool) *Handler {
+func New(database models.Database, debug bool) *Handler {
 	mux := http.NewServeMux()
 	web := &Handler{mux, database, debug, nil, nil}
 	// load templates

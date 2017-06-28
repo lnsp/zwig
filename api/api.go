@@ -11,12 +11,12 @@ import (
 // Handler is a simple API handler.
 type Handler struct {
 	mux      *http.ServeMux
-	database *models.JSONDatabase
+	database models.Database
 	debug    bool
 }
 
 // New initializes a new API handler bound to the given database.
-func New(db *models.JSONDatabase, debug bool) *Handler {
+func New(db models.Database, debug bool) *Handler {
 	mux := http.NewServeMux()
 	api := &Handler{mux, db, debug}
 	mux.HandleFunc("/api/", api.status)
