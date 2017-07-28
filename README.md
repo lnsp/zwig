@@ -1,3 +1,3 @@
 # dodel
 
-Simple community platform made for <span style="color: #0275d8">TUM</span> students.
+Open community platform. Similar to Jodel but open source.
