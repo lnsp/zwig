@@ -1,4 +1,4 @@
-# dodel
+# Zwig
 
 Open platform for communities to share thoughts and ideas.
 

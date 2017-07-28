@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/lnsp/dodel/models"
+	"github.com/lnsp/zwig/models"
 )
 
 // Handler is a simple API handler.

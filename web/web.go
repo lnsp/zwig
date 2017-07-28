@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/lnsp/dodel/models"
-	"github.com/lnsp/dodel/utils"
+	"github.com/lnsp/zwig/models"
+	"github.com/lnsp/zwig/utils"
 	"github.com/pborman/uuid"
 )
 
