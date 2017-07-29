@@ -9,14 +9,13 @@ import (
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/user"
 
 	"golang.org/x/net/context"
 
 	"github.com/lnsp/zwig/utils"
 
 	"github.com/lnsp/zwig/models"
-
-	"github.com/pborman/uuid"
 )
 
 // the duration of the auth cookie
@@ -59,7 +58,14 @@ func New() *Handler {
 	mux.Handle("/comments", web.auth(web.comments, false))
 	mux.Handle("/post", web.auth(web.post, true))
 	mux.Handle("/vote", web.auth(web.vote, true))
+	mux.HandleFunc("/auth/logout", web.logout)
 	return web
+}
+
+func (handler *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	logoutURL, _ := user.LogoutURL(c, "/")
+	http.Redirect(w, r, logoutURL, http.StatusFound)
 }
 
 // ServeHTTP serves HTTP requests.
@@ -97,10 +103,14 @@ func (handler *Handler) list(w http.ResponseWriter, r *http.Request, auth bool, 
 		Karma     int
 		NextColor string
 		Posts     []postItem
+		Main      string
+		User      string
 	}{
 		Karma:     models.GetKarma(c, user),
 		NextColor: colors[rand.Intn(len(colors))],
 		Posts:     items,
+		Main:      "",
+		User:      user,
 	}); err != nil {
 		http.Error(w, "Failed to render template: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -134,11 +144,13 @@ func (handler *Handler) comments(w http.ResponseWriter, r *http.Request, auth bo
 		NextColor string
 		Main      postItem
 		Comments  []postItem
+		User      string
 	}{
 		Karma:     models.GetKarma(c, user),
 		NextColor: colors[rand.Intn(len(colors))],
 		Main:      main,
 		Comments:  items,
+		User:      user,
 	}); err != nil {
 		http.Error(w, "Failed to render template: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -211,22 +223,14 @@ type authMiddleware struct {
 }
 
 func (auth authMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("user_uid")
-	if err != nil && !auth.required {
-		user := uuid.New()
-		http.SetCookie(w, &http.Cookie{
-			Name:   "user_uid",
-			Value:  user,
-			MaxAge: authCookieDuration,
-		})
-		//log.Printf("web.auth: new user granted access to %s\n", r.URL)
-		auth.handler(w, r, true, user)
-	} else if auth.required && err != nil {
-		//log.Printf("web.auth: user not authorized to access %s\n", r.URL)
-		auth.handler(w, r, false, "")
+	c := appengine.NewContext(r)
+	if u := user.Current(c); u != nil {
+		auth.handler(w, r, true, u.Email)
+	} else if auth.required {
+		loginURL, _ := user.LoginURL(c, r.URL.String())
+		http.Redirect(w, r, loginURL, http.StatusFound)
 	} else {
-		//log.Printf("web.auth: existing user allowed to pass to %s\n", r.URL)
-		auth.handler(w, r, true, cookie.Value)
+		auth.handler(w, r, false, "")
 	}
 }
 

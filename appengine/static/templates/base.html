@@ -11,10 +11,13 @@
 	</head>
 	<body>
 		<div class="container main-container">
-			<main class="text-center">
-				<h1 class="display-3"><a class="main-title" href="/">Zwig</a></h1>
-				{{ if .Karma }}<p class="lead">You have earned {{ .Karma }} Karma.</p>{{ end }}
-			</main>
+			<div class="row align-items-center">
+				<div class="col base-panel"><h1>{{ if .Main }} <a href="/">&#9664; {{ else }} <a>&#9650; {{ end }}Zwig</a></h1></div>
+				<div class="col text-center">{{ if .Karma }}<p class="lead">You have earned {{ .Karma }} Karma.</p>{{ end }}</div>
+				<div class="col text-right">
+					{{ if .User }}<b>{{ .User }}</b> | <a href="/auth/logout" class="btn btn-primary">Logout</b></a>{{ end }}
+				</div>
+			</div>
 			<hr>
 			{{ block "content" . }}{{end}}
 		</div>
