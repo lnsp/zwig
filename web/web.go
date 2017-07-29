@@ -2,13 +2,19 @@ package web
 
 import (
 	"html/template"
-	"log"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 
-	"github.com/lnsp/zwig/models"
-	"github.com/lnsp/zwig/utils"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/log"
+
+	"golang.org/x/net/context"
+
+	"zwig/models"
+	"zwig/utils"
+
 	"github.com/pborman/uuid"
 )
 
@@ -34,15 +40,13 @@ type authHandleFunc func(http.ResponseWriter, *http.Request, bool, string)
 // Handler presents a Web UI to interact with posts.
 type Handler struct {
 	mux                *http.ServeMux
-	database           models.Database
-	debug              bool
 	listTmpl, showTmpl *template.Template
 }
 
 // New initializes a new web handler.
-func New(database models.Database, debug bool) *Handler {
+func New() *Handler {
 	mux := http.NewServeMux()
-	web := &Handler{mux, database, debug, nil, nil}
+	web := &Handler{mux, nil, nil}
 	// load templates
 	web.listTmpl = template.Must(template.ParseFiles(baseTemplateFile, listTemplateFile))
 	web.showTmpl = template.Must(template.ParseFiles(baseTemplateFile, showTemplateFile))
@@ -59,9 +63,6 @@ func New(database models.Database, debug bool) *Handler {
 
 // ServeHTTP serves HTTP requests.
 func (handler *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler.debug {
-		log.Printf("web: %s\n", r.URL)
-	}
 	handler.mux.ServeHTTP(w, r)
 }
 
@@ -69,10 +70,10 @@ func (handler *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type postItem struct {
 	User         string `json:"user"`
 	Text         string `json:"text"`
-	Topic        string `json:"topic"`
+	Topic        int64  `json:"topic"`
 	Votes        int    `json:"votes"`
 	Color        string `json:"color"`
-	Post         string `json:"post"`
+	Post         int64  `json:"post"`
 	OwnPost      bool   `json:"own"`
 	HasUpvoted   bool   `json:"upvoted"`
 	HasDownvoted bool   `json:"downvoted"`
@@ -80,17 +81,22 @@ type postItem struct {
 }
 
 func (handler *Handler) list(w http.ResponseWriter, r *http.Request, auth bool, user string) {
-	posts := handler.database.List(models.DefaultListCount, models.DefaultMaxAge, models.DefaultMinRank)
+	c := appengine.NewContext(r)
+	posts, ids, err := models.TopPosts(c, 30, -10)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	items := make([]postItem, len(posts))
-	for i, post := range posts {
-		items[i] = handler.toPostItem(post, user)
+	for i := range posts {
+		items[i] = handler.toPostItem(c, ids[i], posts[i], user)
 	}
 	if err := handler.listTmpl.Execute(w, struct {
 		Karma     int
 		NextColor string
 		Posts     []postItem
 	}{
-		Karma:     handler.database.Karma(user),
+		Karma:     models.GetKarma(c, user),
 		NextColor: colors[rand.Intn(len(colors))],
 		Posts:     items,
 	}); err != nil {
@@ -99,24 +105,35 @@ func (handler *Handler) list(w http.ResponseWriter, r *http.Request, auth bool, 
 }
 
 func (handler *Handler) comments(w http.ResponseWriter, r *http.Request, auth bool, user string) {
-	id := strings.TrimSpace(r.URL.Query().Get("id"))
-	if uuid.Parse(id) == nil {
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	c := appengine.NewContext(r)
+	reqID := strings.TrimSpace(r.URL.Query().Get("id"))
+	id, err := strconv.ParseInt(reqID, 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	comments := handler.database.Comments(id)
-	items := make([]postItem, len(comments))
-	for i, comment := range comments {
-		items[i] = handler.toPostItem(comment, user)
+	post, err := models.GetPost(c, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	main := handler.toPostItem(handler.database.Get(id), user)
+	comments, ids, err := models.GetComments(c, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	items := make([]postItem, len(comments))
+	for i := range comments {
+		items[i] = handler.toPostItem(c, ids[i], comments[i], user)
+	}
+	main := handler.toPostItem(c, id, post, user)
 	if err := handler.showTmpl.Execute(w, struct {
 		Karma     int
 		NextColor string
 		Main      postItem
 		Comments  []postItem
 	}{
-		Karma:     handler.database.Karma(user),
+		Karma:     models.GetKarma(c, user),
 		NextColor: colors[rand.Intn(len(colors))],
 		Main:      main,
 		Comments:  items,
@@ -130,15 +147,12 @@ func (handler *Handler) post(w http.ResponseWriter, r *http.Request, auth bool, 
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
+	c := appengine.NewContext(r)
 	text := r.FormValue("text")
 	color := r.FormValue("color")
 	topic := r.FormValue("topic")
 	keep := r.FormValue("keep")
-
-	if handler.debug {
-		log.Printf("web.post: user=%s color=%s topic=%s keep=%s\n", user, color, topic, keep)
-	}
-
+	log.Debugf(c, "web.post: user=%s color=%s topic=%s keep=%s\n", user, color, topic, keep)
 	redirectURL := "/"
 	if keep != "" {
 		redirectURL = "/comments?id=" + topic
@@ -147,15 +161,22 @@ func (handler *Handler) post(w http.ResponseWriter, r *http.Request, auth bool, 
 		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 		return
 	}
-	handler.database.Post(user, text, color, topic, nil)
+	parent, err := strconv.ParseInt(topic, 10, 64)
+	if topic != "" && err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err := models.SubmitPost(c, user, text, color, parent); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (handler *Handler) vote(w http.ResponseWriter, r *http.Request, auth bool, user string) {
+	c := appengine.NewContext(r)
 	if !auth {
-		if handler.debug {
-			log.Println("web.vote: user not authorized")
-		}
+		log.Debugf(c, "web.vote: user not authorized")
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -164,21 +185,22 @@ func (handler *Handler) vote(w http.ResponseWriter, r *http.Request, auth bool, 
 	post := r.FormValue("post")
 	keep := r.FormValue("keep")
 	topic := r.FormValue("topic")
-
-	if handler.debug {
-		log.Printf("web.vote: post=%s keep=%s topic=%s upvote=%s downvote%s\n", post, keep, topic, upvote, downvote)
+	id, err := strconv.ParseInt(post, 10, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-
+	log.Debugf(c, "web.vote: post=%s keep=%s topic=%s upvote=%s downvote%s\n", post, keep, topic, upvote, downvote)
 	redirectURL := "/"
 	if keep != "" {
 		redirectURL = "/comments?id=" + topic
 	}
-	if upvote != "" {
-		handler.database.Vote(user, post, true)
-	} else if downvote != "" {
-		handler.database.Vote(user, post, false)
+	state := upvote != ""
+	if _, err := models.SubmitVote(c, user, id, state); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
 type authMiddleware struct {
@@ -213,18 +235,24 @@ func (handler *Handler) auth(f authHandleFunc, require bool) *authMiddleware {
 	}
 }
 
-func (handler *Handler) toPostItem(post models.Post, user string) postItem {
-	state := handler.database.VoteState(post.ID, user)
+func (handler *Handler) toPostItem(c context.Context, id int64, post models.Post, user string) postItem {
+	vote, err := models.GetVoteBy(c, id, user)
+	numVotes, _ := models.NumberOfVotes(c, id)
+
+	var parent int64
+	if post.Parent != nil {
+		parent = post.Parent.IntID()
+	}
 	return postItem{
-		Post:         post.ID,
-		User:         post.UserID,
+		Post:         id,
+		User:         post.Author,
 		Text:         post.Text,
-		Votes:        handler.database.CountVotes(post.ID),
+		Votes:        numVotes,
 		Color:        post.Color,
-		Topic:        post.TopicID,
-		OwnPost:      post.UserID == user,
-		HasUpvoted:   state == models.VoteUp,
-		HasDownvoted: state == models.VoteDown,
-		SincePost:    utils.HumanTimeFormat(post.Timestamp),
+		Topic:        parent,
+		OwnPost:      post.Author == user,
+		HasUpvoted:   err == nil && vote.Upvote,
+		HasDownvoted: err == nil && !vote.Upvote,
+		SincePost:    utils.HumanTimeFormat(post.Date),
 	}
 }

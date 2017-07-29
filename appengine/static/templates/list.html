@@ -11,7 +11,7 @@
 {{ range .Posts }}
 <div class="card ">
 	<div class="card-block bg-{{ .Color }}">
-		<a class="main-title" href="/comments?id={{ .Post }}">
+		<a class="post-title" href="/comments?id={{ .Post }}">
 			<form action="/vote">
 				<div class="row">
 					<input type="hidden" name="post" value="{{ .Post }}">

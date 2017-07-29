@@ -1,0 +1,89 @@
+body {
+	background-color: #f7f7f7;
+}
+.button-upvote {
+	border: none;
+}
+.since-post {
+	color: #f7f7f7;
+	text-align: right;
+}
+.button-downvote {
+	border: none;
+}
+.vote-block {
+	padding-right: 1em;
+}
+.card {
+	margin-bottom: 1em;
+}
+.bg-red {
+	background-color: #d9534f;
+}
+.bg-red:hover {
+	background-color: #d9424f;
+}
+.bg-blue {
+	background-color: #0275d8;
+}
+.bg-blue:hover {
+	background-color: #0253d8;
+}
+.bg-green {
+	background-color: #5cb85c;
+}
+.bg-green:hover {
+	background-color: #4ca84c;
+}
+.bg-orange {
+	background-color: #ec971f;
+}
+.bg-orange:hover {
+	background-color: #ec870f;
+}
+.bg-none {
+	background-color: rgba(0,0,0,0);
+	color: #fff;
+}
+.bg-inactive {
+	background-color: rgba(0,0,0,0);
+	color: rgba(255,255,255,0.5);
+}
+.bg-inactive:hover {
+	color: rgba(255, 255, 255, 1.0);
+}
+.main-container {
+	margin-top: 1em;
+}
+.post-title {
+	color: #f7f7f7;
+}
+.post-title:hover {
+	color: #f7f7f7;
+}
+.Zwig {
+	color: #f7f7f7;
+}
+.Zwig-input {
+	resize: none;
+}
+.color-button {
+	color: #f7f7f7;
+}
+.card-votes {
+	color: #f7f7f7;
+}
+.card-header {
+	color: #f7f7f7;
+}
+.full-width {
+	padding: 0;
+	padding-top: 1em;
+	padding-left: 1em;
+}
+a:hover {
+	text-decoration: none;
+}
+.card-block {
+	color: #f7f7f7;
+}

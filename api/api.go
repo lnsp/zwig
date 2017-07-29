@@ -2,23 +2,26 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
-	"github.com/lnsp/zwig/models"
+	"google.golang.org/appengine"
+
+	"zwig/models"
+)
+
+const (
+	APIVersion = "v1.0.0"
 )
 
 // Handler is a simple API handler.
 type Handler struct {
-	mux      *http.ServeMux
-	database models.Database
-	debug    bool
+	mux *http.ServeMux
 }
 
 // New initializes a new API handler bound to the given database.
-func New(db models.Database, debug bool) *Handler {
+func New() *Handler {
 	mux := http.NewServeMux()
-	api := &Handler{mux, db, debug}
+	api := &Handler{mux}
 	mux.HandleFunc("/api/", api.status)
 	mux.HandleFunc("/api/add", api.add)
 	mux.HandleFunc("/api/list", api.list)
@@ -30,29 +33,31 @@ func New(db models.Database, debug bool) *Handler {
 
 // ServeHTTP serves HTTP requests.
 func (handler *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if handler.debug {
-		log.Printf("api: %v\n", r.URL.String())
-	}
 	handler.mux.ServeHTTP(w, r)
 }
 
 // /add DATA={user, color, text, topic} -> {id}
 func (handler *Handler) add(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	decoder := json.NewDecoder(r.Body)
 	add := struct {
-		User  string `json:"user"`
-		Color string `json:"color"`
-		Text  string `json:"text"`
-		Topic string `json:"topic"`
+		Author string `json:"user"`
+		Color  string `json:"color"`
+		Text   string `json:"text"`
+		Parent int64  `json:"topic"`
 	}{}
 	if err := decoder.Decode(&add); err != nil {
 		http.Error(w, "Failed to parse JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	id := handler.database.Post(add.User, add.Text, add.Color, add.Topic, nil)
+	id, err := models.SubmitPost(c, add.Author, add.Text, add.Color, add.Parent)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(struct {
-		ID string `json:"id"`
+		ID int64 `json:"id"`
 	}{
 		ID: id,
 	}); err != nil {
@@ -62,48 +67,72 @@ func (handler *Handler) add(w http.ResponseWriter, r *http.Request) {
 
 // list -> [JSONPost...]
 func (handler *Handler) list(w http.ResponseWriter, r *http.Request) {
-	posts := handler.database.List(models.DefaultListCount, models.DefaultMaxAge, models.DefaultMinRank)
-	jsonPosts := handler.database.ToJSONPosts(posts)
+	c := appengine.NewContext(r)
+	posts, ids, err := models.TopPosts(c, 30, -10.0)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonPosts, err := models.ToJSONComments(c, posts, ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(jsonPosts); err != nil {
 		http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
 // show DATA={id} -> {JSONPost}
 func (handler *Handler) show(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	dec := json.NewDecoder(r.Body)
 	req := struct {
-		ID string `json:"id"`
+		ID int64 `json:"id"`
 	}{}
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "Failed to decode JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	selected := handler.database.Get(req.ID)
-	if selected.ID == "" {
-		http.Error(w, "Post not found", http.StatusNotFound)
+	post, err := models.GetPost(c, req.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	numVotes, err := models.NumberOfVotes(c, req.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	encoder := json.NewEncoder(w)
-	comments := handler.database.Comments(selected.ID)
-	jsonComments := handler.database.ToJSONPosts(comments)
+	comments, ids, err := models.GetComments(c, req.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonComments, err := models.ToJSONComments(c, comments, ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := encoder.Encode(struct {
-		ID        string            `json:"id"`
-		User      string            `json:"user"`
-		Text      string            `json:"text"`
-		Votes     int               `json:"votes"`
-		Timestamp int64             `json:"timestamp"`
-		Color     string            `json:"color"`
-		Comments  []models.JSONPost `json:"comments"`
+		ID       int64             `json:"id"`
+		Author   string            `json:"user"`
+		Text     string            `json:"text"`
+		Votes    int               `json:"votes"`
+		Date     int64             `json:"timestamp"`
+		Color    string            `json:"color"`
+		Comments []models.JSONPost `json:"comments"`
 	}{
-		Color:     selected.Color,
-		ID:        selected.ID,
-		User:      selected.UserID,
-		Text:      selected.Text,
-		Votes:     handler.database.CountVotes(selected.ID),
-		Timestamp: selected.Timestamp.Unix(),
-		Comments:  jsonComments,
+		Color:    post.Color,
+		ID:       req.ID,
+		Author:   post.Author,
+		Text:     post.Text,
+		Votes:    numVotes,
+		Date:     post.Date.Unix(),
+		Comments: jsonComments,
 	}); err != nil {
 		http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -111,23 +140,32 @@ func (handler *Handler) show(w http.ResponseWriter, r *http.Request) {
 
 // /vote DATA={post, user, upvote} -> {votes}
 func (handler *Handler) vote(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	dec := json.NewDecoder(r.Body)
 	req := struct {
-		Post string `json:"post"`
-		User string `json:"user"`
-		Up   bool   `json:"upvote"`
+		Post   int64  `json:"post"`
+		Author string `json:"user"`
+		Upvote bool   `json:"upvote"`
 	}{}
 	if err := dec.Decode(&req); err != nil {
 		http.Error(w, "Failed to decode JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	handler.database.Vote(req.User, req.Post, req.Up)
-	count := handler.database.CountVotes(req.Post)
+	_, err := models.SubmitVote(c, req.Author, req.Post, req.Upvote)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	numVotes, err := models.NumberOfVotes(c, req.Post)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(struct {
 		Votes int `json:"votes"`
 	}{
-		Votes: count,
+		Votes: numVotes,
 	}); err != nil {
 		http.Error(w, "Failed to encode JSON: "+err.Error(), http.StatusInternalServerError)
 	}
@@ -135,6 +173,7 @@ func (handler *Handler) vote(w http.ResponseWriter, r *http.Request) {
 
 // /karma DATA={user} -> {karma}
 func (handler *Handler) karma(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
 	dec := json.NewDecoder(r.Body)
 	req := struct {
 		User string `json:"user"`
@@ -143,7 +182,7 @@ func (handler *Handler) karma(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to decode JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	karma := handler.database.Karma(req.User)
+	karma := models.GetKarma(c, req.User)
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(struct {
 		Karma int `json:"karma"`
@@ -154,7 +193,6 @@ func (handler *Handler) karma(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// / -> service status
 func (handler *Handler) status(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("ok"))
+	w.Write([]byte(APIVersion))
 }
