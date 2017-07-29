@@ -15,7 +15,7 @@
             <div class="row">
                 <input type="hidden" name="post" value="{{ .Main.Post }}">
                 <input type="hidden" name="keep" value="keep">
-                <div class="text-center vote-block col-xs-2">
+                <div class="text-center {{ if .Main.Voted }}button-disabled{{ end }} vote-block col-xs-2">
                     <button class="button-upvote {{ if .Main.HasUpvoted }}bg-none active{{ else }}bg-inactive{{end }}" role="submit" name="upvote" value="upvote">▲</button><br>
                     <span class="card-votes">{{ .Main.Votes }}</span><br>
                     <button class="button-downvote {{ if .Main.HasDownvoted }}bg-none active{{ else }}bg-inactive{{end}}" role="submit" name="downvote" value="downvote">▼</button>
@@ -36,7 +36,7 @@
                         <input type="hidden" name="topic" value="{{ .Topic }}">
                         <input type="hidden" name="keep" value="keep">
                         <input type="hidden" name="post" value="{{ .Post }}">
-                        <div class="text-center vote-block col-xs-2">
+                        <div class="text-center {{ if .Voted }}button-disabled{{ end }} vote-block col-xs-2">
                             <button class="button-upvote {{ if .HasUpvoted }}bg-none active{{ else }}bg-inactive{{end }}" role="submit" name="upvote" value="upvote">▲</button><br>
                             <span class="card-votes">{{ .Votes }}</span><br>
                             <button class="button-downvote {{ if .HasDownvoted }}bg-none active{{ else }}bg-inactive{{end}}" role="submit" name="downvote" value="downvote">▼</button>

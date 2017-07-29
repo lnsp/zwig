@@ -11,11 +11,11 @@
 {{ range .Posts }}
 <div class="card ">
 	<div class="card-block bg-{{ .Color }}">
-		<a class="main-title" href="/comments?id={{ .Post }}">
+		<a class="post-title" href="/comments?id={{ .Post }}">
 			<form action="/vote">
 				<div class="row">
 					<input type="hidden" name="post" value="{{ .Post }}">
-					<div class="text-center vote-block col-xs-2">
+					<div class="text-center {{ if .Voted }}button-disabled{{ end }} vote-block col-xs-2">
 						<button class="button-upvote {{ if .HasUpvoted }}bg-none active{{ else }}bg-inactive{{end }}" role="submit" name="upvote" value="upvote">▲</button><br>
 						<span class="card-votes">{{ .Votes }}</span><br>
 						<button class="button-downvote {{ if .HasDownvoted }}bg-none active{{ else }}bg-inactive{{end}}" role="submit" name="downvote" value="downvote">▼</button>
