@@ -1,6 +1,9 @@
 body {
 	background-color: #f7f7f7;
 }
+.button-disabled {
+	pointer-events: none;
+}
 .button-upvote {
 	border: none;
 }

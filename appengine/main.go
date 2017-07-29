@@ -2,8 +2,10 @@ package appengine
 
 import (
 	"net/http"
-	"zwig/api"
-	"zwig/web"
+
+	"github.com/lnsp/zwig/web"
+
+	"github.com/lnsp/zwig/api"
 )
 
 var (

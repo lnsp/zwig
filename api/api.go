@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/appengine"
 
-	"zwig/models"
+	"github.com/lnsp/zwig/models"
 )
 
 const (

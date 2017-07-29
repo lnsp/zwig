@@ -12,8 +12,9 @@ import (
 
 	"golang.org/x/net/context"
 
-	"zwig/models"
-	"zwig/utils"
+	"github.com/lnsp/zwig/utils"
+
+	"github.com/lnsp/zwig/models"
 
 	"github.com/pborman/uuid"
 )
@@ -76,6 +77,7 @@ type postItem struct {
 	Post         int64  `json:"post"`
 	OwnPost      bool   `json:"own"`
 	HasUpvoted   bool   `json:"upvoted"`
+	Voted        bool   `json:"voted"`
 	HasDownvoted bool   `json:"downvoted"`
 	SincePost    string `json:"since"`
 }
@@ -254,5 +256,6 @@ func (handler *Handler) toPostItem(c context.Context, id int64, post models.Post
 		HasUpvoted:   err == nil && vote.Upvote,
 		HasDownvoted: err == nil && !vote.Upvote,
 		SincePost:    utils.HumanTimeFormat(post.Date),
+		Voted:        err == nil,
 	}
 }
