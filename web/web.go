@@ -207,7 +207,11 @@ func (handler *Handler) vote(w http.ResponseWriter, r *http.Request, auth bool, 
 	log.Debugf(c, "web.vote: post=%s keep=%s topic=%s upvote=%s downvote%s\n", post, keep, topic, upvote, downvote)
 	redirectURL := "/"
 	if keep != "" {
-		redirectURL = "/comments?id=" + topic
+		if topic != "" {
+			redirectURL = "/comments?id=" + topic
+		} else {
+			redirectURL = "/comments?id=" + post
+		}
 	}
 	state := upvote != ""
 	if _, err := models.SubmitVote(c, user, id, state); err != nil {
@@ -245,17 +249,13 @@ func (handler *Handler) toPostItem(c context.Context, id int64, post models.Post
 	vote, err := models.GetVoteBy(c, id, user)
 	numVotes, _ := models.NumberOfVotes(c, id)
 
-	var parent int64
-	if post.Parent != nil {
-		parent = post.Parent.IntID()
-	}
 	return postItem{
 		Post:         id,
 		User:         post.Author,
 		Text:         post.Text,
 		Votes:        numVotes,
 		Color:        post.Color,
-		Topic:        parent,
+		Topic:        post.Parent,
 		OwnPost:      post.Author == user,
 		HasUpvoted:   err == nil && vote.Upvote,
 		HasDownvoted: err == nil && !vote.Upvote,

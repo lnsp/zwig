@@ -24,7 +24,7 @@ func voteKey(c context.Context, id int64) *datastore.Key {
 
 // Vote stores information about a user's vote on a post.
 type Vote struct {
-	Post   *datastore.Key
+	Post   int64
 	Author string
 	Upvote bool
 	Date   time.Time
@@ -32,7 +32,6 @@ type Vote struct {
 
 // SubmitVote puts out a vote and updates the votes rank.
 func SubmitVote(c context.Context, author string, id int64, upvote bool) (int64, error) {
-	key := postKey(c, id)
 	if _, err := GetPost(c, id); err != nil {
 		return 0, fmt.Errorf("SubmitVote: could not find post: %v", err)
 	}
@@ -47,7 +46,7 @@ func SubmitVote(c context.Context, author string, id int64, upvote bool) (int64,
 		return 0, fmt.Errorf("SubmitVote: user already voted on post")
 	}
 	vote := Vote{
-		Post:   key,
+		Post:   id,
 		Author: author,
 		Upvote: upvote,
 		Date:   time.Now(),
@@ -76,8 +75,7 @@ func GetVote(c context.Context, id int64) (Vote, error) {
 // GetVoteBy retrieves a vote on a post by a user.
 func GetVoteBy(c context.Context, id int64, author string) (Vote, error) {
 	var votes []Vote
-	key := postKey(c, id)
-	if _, err := datastore.NewQuery("Vote").Filter("Author =", author).Filter("Post =", key).GetAll(c, &votes); err != nil {
+	if _, err := datastore.NewQuery("Vote").Filter("Author =", author).Filter("Post =", id).GetAll(c, &votes); err != nil {
 		return Vote{}, fmt.Errorf("GetVoteBy: could not collect votes: %v", err)
 	}
 	if len(votes) != 1 {
@@ -88,8 +86,7 @@ func GetVoteBy(c context.Context, id int64, author string) (Vote, error) {
 
 // HasVotedOn retrieves if the user has submitted a vote on the given post.
 func HasVotedOn(c context.Context, post int64, author string) (bool, error) {
-	key := postKey(c, post)
-	count, err := datastore.NewQuery("Vote").Filter("Author =", author).Filter("Post =", key).Count(c)
+	count, err := datastore.NewQuery("Vote").Filter("Author =", author).Filter("Post =", post).Count(c)
 	if err != nil {
 		return false, fmt.Errorf("HasVotedOn: could not collect votes: %v", err)
 	}
@@ -99,7 +96,7 @@ func HasVotedOn(c context.Context, post int64, author string) (bool, error) {
 // NumberOfVotes calculates the number of votes a post has received. This is a relative number.
 func NumberOfVotes(c context.Context, id int64) (int, error) {
 	var votes []Vote
-	_, err := datastore.NewQuery("Vote").Filter("Post =", postKey(c, id)).GetAll(c, &votes)
+	_, err := datastore.NewQuery("Vote").Filter("Post =", id).GetAll(c, &votes)
 	if err != nil {
 		return 0, fmt.Errorf("NumberOfVotes: could not collect votes: %v", err)
 	}
@@ -129,7 +126,7 @@ func postKey(c context.Context, id int64) *datastore.Key {
 // TopPosts collects the top n posts with a minimum rank of x from the datastore.
 func TopPosts(c context.Context, limit int, rank float64) ([]Post, []int64, error) {
 	var posts []Post
-	keys, err := datastore.NewQuery("Post").Filter("Rank >", rank).Limit(limit).GetAll(c, &posts)
+	keys, err := datastore.NewQuery("Post").Filter("Parent =", 0).Filter("Rank >", rank).Order("-Rank").Limit(limit).GetAll(c, &posts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("TopPosts: could not collect posts: %v", err)
 	}
@@ -159,12 +156,10 @@ func UpdateRank(c context.Context, id int64) error {
 
 // SubmitPost stores a post in the datastore.
 func SubmitPost(c context.Context, author, text, color string, parent int64) (int64, error) {
-	var parentKey *datastore.Key
 	if parent != 0 {
 		if _, err := GetPost(c, parent); err != nil {
 			return 0, fmt.Errorf("SubmitPost: could not find parent: %v", err)
 		}
-		parentKey = postKey(c, parent)
 	}
 	// verify input
 	author = strings.TrimSpace(author)
@@ -174,7 +169,7 @@ func SubmitPost(c context.Context, author, text, color string, parent int64) (in
 	}
 	post := Post{
 		Author: author,
-		Parent: parentKey,
+		Parent: parent,
 		Text:   text,
 		Color:  color,
 		Date:   time.Now(),
@@ -190,7 +185,7 @@ func SubmitPost(c context.Context, author, text, color string, parent int64) (in
 
 // NumberOfComments retrieves the number of comments a post has received.
 func NumberOfComments(c context.Context, id int64) (int, error) {
-	count, err := datastore.NewQuery("Post").Filter("Parent =", postKey(c, id)).Count(c)
+	count, err := datastore.NewQuery("Post").Filter("Parent =", id).Count(c)
 	if err != nil {
 		return 0, fmt.Errorf("NumberOfComments: could not collect posts: %v", err)
 	}
@@ -209,7 +204,7 @@ func GetPost(c context.Context, id int64) (Post, error) {
 // GetComments retrieves all comments on the specified post ordered by rank.
 func GetComments(c context.Context, id int64) ([]Post, []int64, error) {
 	var comments []Post
-	keys, err := datastore.NewQuery("Post").Filter("Parent =", postKey(c, id)).Order("-Rank").GetAll(c, &comments)
+	keys, err := datastore.NewQuery("Post").Filter("Parent =", id).Order("Date").GetAll(c, &comments)
 	if err != nil {
 		return nil, nil, fmt.Errorf("GetComments: could not collect posts: %v", err)
 	}
@@ -239,10 +234,6 @@ func ToJSONComments(c context.Context, comments []Post, ids []int64) ([]JSONPost
 
 // ToJSONPost converts the post to a JSON serializable representation.
 func ToJSONPost(c context.Context, id int64, post Post) (JSONPost, error) {
-	var parent int64
-	if post.Parent != nil {
-		parent = post.Parent.IntID()
-	}
 	numVotes, err := NumberOfVotes(c, id)
 	if err != nil {
 		return JSONPost{}, fmt.Errorf("GetJSONPost: %v", err)
@@ -254,7 +245,7 @@ func ToJSONPost(c context.Context, id int64, post Post) (JSONPost, error) {
 
 	return JSONPost{
 		ID:       id,
-		Parent:   parent,
+		Parent:   post.Parent,
 		Date:     post.Date.Unix(),
 		Author:   post.Author,
 		Text:     post.Text,
@@ -267,7 +258,7 @@ func ToJSONPost(c context.Context, id int64, post Post) (JSONPost, error) {
 // Post stores information about a user's post like ID, userID and topicID.
 type Post struct {
 	Author string
-	Parent *datastore.Key
+	Parent int64
 	Text   string
 	Color  string
 	Date   time.Time
