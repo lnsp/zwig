@@ -50,9 +50,6 @@ func New() *Handler {
 	// load templates
 	web.listTmpl = template.Must(template.ParseFiles(baseTemplateFile, listTemplateFile))
 	web.showTmpl = template.Must(template.ParseFiles(baseTemplateFile, showTemplateFile))
-	// add static resource routes
-	mux.Handle("/static/css/", http.StripPrefix("/static/css/", http.FileServer(http.Dir("static/css"))))
-	mux.Handle("/static/js/", http.StripPrefix("/static/js/", http.FileServer(http.Dir("static/js"))))
 	// add dynamic routes
 	mux.Handle("/", web.auth(web.list, false))
 	mux.Handle("/comments", web.auth(web.comments, false))
