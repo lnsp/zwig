@@ -20,6 +20,30 @@ body {
 .card {
 	margin-bottom: 1em;
 }
+.fg-red {
+	color: #d9534f;
+}
+.fg-red:hover {
+	color: #d9424f;
+}
+.fg-blue {
+	color: #0275d8;
+}
+.fg-blue:hover {
+	color: #0253d8;
+}
+.fg-green {
+	color: #5cb85c;
+}
+.fg-green:hover {
+	color: #4ca84c;
+}
+.fg-orange 
+	color: #ec971f;
+}
+.fg-orange:hover {
+	color: #ec870f;
+}
 .bg-red {
 	background-color: #d9534f;
 }
