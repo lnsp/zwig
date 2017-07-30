@@ -126,7 +126,7 @@ func postKey(c context.Context, id int64) *datastore.Key {
 // TopPosts collects the top n posts with a minimum rank of x from the datastore.
 func TopPosts(c context.Context, limit int, rank float64) ([]Post, []int64, error) {
 	var posts []Post
-	keys, err := datastore.NewQuery("Post").Filter("Parent =", 0).Filter("Rank >", rank).Order("-Rank").Limit(limit).GetAll(c, &posts)
+	keys, err := datastore.NewQuery("Post").Filter("Parent =", 0).Order("Rank").Limit(limit).GetAll(c, &posts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("TopPosts: could not collect posts: %v", err)
 	}
