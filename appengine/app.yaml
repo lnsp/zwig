@@ -4,5 +4,7 @@ api_version: go1
 handlers:
 - url: /static/css
   static_dir: static/css
+- url: /static/icons
+  static_dir: static/icons
 - url: /.*
   script: _go_app
