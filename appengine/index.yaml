@@ -3,12 +3,10 @@ indexes:
   properties:
   - name: Parent
   - name: Rank
-    direction: desc
 - kind: Post
   properties:
   - name: Parent
   - name: Date
-    direction: asc
 - kind: Vote
   properties:
   - name: Author
