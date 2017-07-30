@@ -3,6 +3,7 @@ indexes:
   properties:
   - name: Parent
   - name: Rank
+    direction: desc
 - kind: Post
   properties:
   - name: Parent
