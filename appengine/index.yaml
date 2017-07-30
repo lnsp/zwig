@@ -1,11 +1,11 @@
 indexes:
 - kind: Post
-  ancestor: true
   properties:
+  - name: Parent
   - name: Date
+  - name: Rank
     direction: desc
 - kind: Vote
-  ancestor: true
   properties:
   - name: Author
-    direction: desc
+  - name: Post
