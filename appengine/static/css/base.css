@@ -1,5 +1,6 @@
 body {
 	background-color: #f7f7f7;
+	height: 100%;
 }
 .button-disabled {
 	pointer-events: none;
@@ -13,6 +14,12 @@ body {
 }
 .button-downvote {
 	border: none;
+}
+footer {
+	position: absolute;
+	text-align: center;
+	display: block;
+	font-weight: 600;
 }
 .vote-block {
 	padding-right: 1em;
